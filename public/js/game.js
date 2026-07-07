@@ -38,10 +38,25 @@
       for (const s of this.snakes)
         for (const [x, y] of s.path) this.owner[y * this.cols + x] = s.id;
 
+      // camera: screen = base * zoom + pan (pan in CSS px)
+      this.zoom = 1;
+      this.panX = 0;
+      this.panY = 0;
+      this.pointers = new Map();
+      this.gesture = null;
+      this._rr = 0;
+
       this._onResize = () => { this.layout(); this.render(); };
       window.addEventListener('resize', this._onResize);
-      this._onTap = e => this.handleTap(e);
-      canvas.addEventListener('pointerdown', this._onTap);
+      this._onDown = e => this.onDown(e);
+      this._onMove = e => this.onMove(e);
+      this._onUp = e => this.onUp(e);
+      this._onWheel = e => this.onWheel(e);
+      canvas.addEventListener('pointerdown', this._onDown);
+      canvas.addEventListener('pointermove', this._onMove);
+      canvas.addEventListener('pointerup', this._onUp);
+      canvas.addEventListener('pointercancel', this._onUp);
+      canvas.addEventListener('wheel', this._onWheel, { passive: false });
 
       this.layout();
       this.render();
@@ -49,8 +64,13 @@
 
     destroy() {
       window.removeEventListener('resize', this._onResize);
-      this.canvas.removeEventListener('pointerdown', this._onTap);
+      this.canvas.removeEventListener('pointerdown', this._onDown);
+      this.canvas.removeEventListener('pointermove', this._onMove);
+      this.canvas.removeEventListener('pointerup', this._onUp);
+      this.canvas.removeEventListener('pointercancel', this._onUp);
+      this.canvas.removeEventListener('wheel', this._onWheel);
       cancelAnimationFrame(this.raf);
+      cancelAnimationFrame(this._rr);
       this.finished = true;
     }
 
@@ -69,6 +89,7 @@
       this.ox = (w - this.cell * this.cols) / 2;
       this.oy = (h - this.cell * this.rows) / 2;
       this.buildDots();
+      this.clampPan();
     }
 
     // Pre-render the faint dot grid once per layout; on huge boards drawing
@@ -112,15 +133,115 @@
       return null;
     }
 
-    handleTap(e) {
-      if (this.finished || this.hearts <= 0) return;
-      const rect = this.canvas.getBoundingClientRect();
-      const px = e.clientX - rect.left, py = e.clientY - rect.top;
-      const s = this.snakeAt(px, py);
-      if (!s) return;
-      this.tap(s);
+    // ---------- camera & input ----------
+
+    toLocal(e) {
+      const r = this.canvas.getBoundingClientRect();
+      return [e.clientX - r.left, e.clientY - r.top];
     }
 
+    clampPan() {
+      const w = this.canvas.clientWidth, h = this.canvas.clientHeight;
+      const z = this.zoom;
+      const L = this.ox * z, R = (this.ox + this.cols * this.cell) * z;
+      const T = this.oy * z, B = (this.oy + this.rows * this.cell) * z;
+      if (R - L <= w) this.panX = w / 2 - (L + R) / 2;
+      else this.panX = Math.min(-L, Math.max(w - R, this.panX));
+      if (B - T <= h) this.panY = h / 2 - (T + B) / 2;
+      else this.panY = Math.min(-T, Math.max(h - B, this.panY));
+    }
+
+    // zoom so the board point under `anchor` (CSS px) stays put
+    zoomAt(newZoom, anchor, fromZoom, fromPanX, fromPanY) {
+      newZoom = Math.min(8, Math.max(1, newZoom));
+      const bx = (anchor[0] - fromPanX) / fromZoom;
+      const by = (anchor[1] - fromPanY) / fromZoom;
+      this.zoom = newZoom;
+      this.panX = anchor[0] - bx * newZoom;
+      this.panY = anchor[1] - by * newZoom;
+      this.clampPan();
+      this.requestRender();
+    }
+
+    requestRender() {
+      if (this._rr) return;
+      this._rr = requestAnimationFrame(() => { this._rr = 0; this.render(); });
+    }
+
+    onDown(e) {
+      this.canvas.setPointerCapture(e.pointerId);
+      const p = this.toLocal(e);
+      this.pointers.set(e.pointerId, p);
+      if (this.pointers.size === 1) {
+        this.gesture = { type: 'press', start: p, panX: this.panX, panY: this.panY, moved: false };
+      } else if (this.pointers.size === 2) {
+        const [a, b] = [...this.pointers.values()];
+        this.gesture = {
+          type: 'pinch',
+          dist: Math.hypot(a[0] - b[0], a[1] - b[1]),
+          mid: [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2],
+          zoom: this.zoom, panX: this.panX, panY: this.panY
+        };
+      }
+    }
+
+    onMove(e) {
+      if (!this.pointers.has(e.pointerId)) return;
+      const p = this.toLocal(e);
+      this.pointers.set(e.pointerId, p);
+      const g = this.gesture;
+      if (!g) return;
+      if (g.type === 'pinch' && this.pointers.size >= 2) {
+        const [a, b] = [...this.pointers.values()];
+        const dist = Math.hypot(a[0] - b[0], a[1] - b[1]);
+        const mid = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
+        const bx = (g.mid[0] - g.panX) / g.zoom;
+        const by = (g.mid[1] - g.panY) / g.zoom;
+        this.zoom = Math.min(8, Math.max(1, g.zoom * dist / g.dist));
+        this.panX = mid[0] - bx * this.zoom;
+        this.panY = mid[1] - by * this.zoom;
+        this.clampPan();
+        this.requestRender();
+      } else if (g.type !== 'pinch') {
+        const dx = p[0] - g.start[0], dy = p[1] - g.start[1];
+        if (!g.moved && Math.hypot(dx, dy) > 7) g.moved = true;
+        if (g.moved) {
+          this.panX = g.panX + dx;
+          this.panY = g.panY + dy;
+          this.clampPan();
+          this.requestRender();
+        }
+      }
+    }
+
+    onUp(e) {
+      if (!this.pointers.has(e.pointerId)) return;
+      this.pointers.delete(e.pointerId);
+      const g = this.gesture;
+      if (g && g.type === 'press' && !g.moved && this.pointers.size === 0) {
+        if (!this.finished && this.hearts > 0) {
+          const bx = (g.start[0] - this.panX) / this.zoom;
+          const by = (g.start[1] - this.panY) / this.zoom;
+          const s = this.snakeAt(bx, by);
+          if (s) this.tap(s);
+        }
+      }
+      if (this.pointers.size === 1) {
+        // pinch ended with one finger still down: continue as pan
+        const p = [...this.pointers.values()][0];
+        this.gesture = { type: 'press', start: p, panX: this.panX, panY: this.panY, moved: true };
+      } else if (this.pointers.size === 0) {
+        this.gesture = null;
+      }
+    }
+
+    onWheel(e) {
+      e.preventDefault();
+      const factor = Math.exp(-e.deltaY * 0.0012);
+      this.zoomAt(this.zoom * factor, this.toLocal(e), this.zoom, this.panX, this.panY);
+    }
+
+    // px, py in base (unzoomed) board coordinates
     snakeAt(px, py) {
       // nearest occupied cell center within ~0.7 cells
       let best = null, bestD = this.cell * 0.7;
@@ -210,11 +331,35 @@
     render(now) {
       now = now || performance.now();
       const ctx = this.ctx;
+      const w = this.canvas.clientWidth, h = this.canvas.clientHeight;
       ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
-      ctx.clearRect(0, 0, this.canvas.clientWidth, this.canvas.clientHeight);
+      ctx.clearRect(0, 0, w, h);
 
-      // faint dot grid (pre-rendered in buildDots)
-      ctx.drawImage(this.dots, 0, 0, this.canvas.clientWidth, this.canvas.clientHeight);
+      // faint dot grid: cached image when unzoomed, else draw only the
+      // dots inside the visible window (sharp at any zoom level)
+      if (this.zoom === 1) {
+        ctx.drawImage(this.dots, 0, 0, w, h);
+      }
+
+      // camera
+      ctx.translate(this.panX, this.panY);
+      ctx.scale(this.zoom, this.zoom);
+
+      if (this.zoom !== 1) {
+        const inv = 1 / this.zoom;
+        const gx0 = Math.max(0, Math.floor(((-this.panX) * inv - this.ox) / this.cell));
+        const gx1 = Math.min(this.cols - 1, Math.ceil(((w - this.panX) * inv - this.ox) / this.cell));
+        const gy0 = Math.max(0, Math.floor(((-this.panY) * inv - this.oy) / this.cell));
+        const gy1 = Math.min(this.rows - 1, Math.ceil(((h - this.panY) * inv - this.oy) / this.cell));
+        ctx.fillStyle = 'rgba(35,41,70,0.12)';
+        const r = Math.max(0.75, this.cell * 0.045);
+        for (let gy = gy0; gy <= gy1; gy++)
+          for (let gx = gx0; gx <= gx1; gx++) {
+            ctx.beginPath();
+            ctx.arc(this.cx(gx), this.cy(gy), r, 0, Math.PI * 2);
+            ctx.fill();
+          }
+      }
 
       for (const s of this.snakes) {
         if (s.removed && !s.anim) continue;

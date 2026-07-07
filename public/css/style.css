@@ -130,7 +130,7 @@ html, body {
 .hearts span.lost { color: #d4d5e0; transform: scale(.85); }
 
 #board-wrap { flex: 1; min-height: 0; position: relative; }
-#board { display: block; touch-action: manipulation; }
+#board { display: block; touch-action: none; cursor: pointer; }
 
 /* ---------- sub screens ---------- */
 .sub-top { display: flex; align-items: center; gap: 8px; padding: 12px 14px 6px; }
