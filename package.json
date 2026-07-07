@@ -1,0 +1,15 @@
+{
+  "name": "arrows-puzzle",
+  "version": "1.0.0",
+  "description": "Arrows puzzle game clone - tap arrows to clear the board. Infinite seeded levels, lives, redeem codes, global & group leaderboards.",
+  "main": "server/index.js",
+  "scripts": {
+    "start": "node server/index.js",
+    "test:gen": "node server/tools/test-gen.js",
+    "codes": "node server/tools/make-codes.js"
+  },
+  "license": "MIT",
+  "dependencies": {
+    "express": "^4.19.2"
+  }
+}
