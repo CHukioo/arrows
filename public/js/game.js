@@ -42,6 +42,7 @@
       this.zoom = 1;
       this.panX = 0;
       this.panY = 0;
+      this.gridMode = false;   // overlay: grid lines + arrow escape paths
       this.pointers = new Map();
       this.gesture = null;
       this._rr = 0;
@@ -361,11 +362,75 @@
           }
       }
 
+      if (this.gridMode) this.drawGridLines(w, h);
+
       for (const s of this.snakes) {
         if (s.removed && !s.anim) continue;
         if (s.anim) this.drawExiting(s, now);
         else this.drawStatic(s, now);
       }
+
+      if (this.gridMode) this.drawPaths();
+    }
+
+    setGridMode(on) {
+      this.gridMode = !!on;
+      this.requestRender();
+    }
+
+    drawGridLines(w, h) {
+      const ctx = this.ctx;
+      // only the visible span, so 40×56 boards stay cheap when zoomed
+      const inv = 1 / this.zoom;
+      const x0 = Math.max(0, Math.floor(((-this.panX) * inv - this.ox) / this.cell));
+      const x1 = Math.min(this.cols, Math.ceil(((w - this.panX) * inv - this.ox) / this.cell));
+      const y0 = Math.max(0, Math.floor(((-this.panY) * inv - this.oy) / this.cell));
+      const y1 = Math.min(this.rows, Math.ceil(((h - this.panY) * inv - this.oy) / this.cell));
+      ctx.strokeStyle = 'rgba(35,41,70,0.16)';
+      ctx.lineWidth = 1 / this.zoom;
+      ctx.beginPath();
+      for (let gx = x0; gx <= x1; gx++) {
+        const px = this.ox + gx * this.cell;
+        ctx.moveTo(px, this.oy + y0 * this.cell);
+        ctx.lineTo(px, this.oy + y1 * this.cell);
+      }
+      for (let gy = y0; gy <= y1; gy++) {
+        const py = this.oy + gy * this.cell;
+        ctx.moveTo(this.ox + x0 * this.cell, py);
+        ctx.lineTo(this.ox + x1 * this.cell, py);
+      }
+      ctx.stroke();
+    }
+
+    // Draw each live arrow's escape ray to the board edge, green if the ray
+    // is currently clear (tappable now) or red if another arrow blocks it.
+    drawPaths() {
+      const ctx = this.ctx;
+      ctx.lineWidth = Math.max(1.5, this.cell * 0.07);
+      ctx.lineCap = 'round';
+      const dash = this.cell * 0.32;
+      for (const s of this.snakes) {
+        if (s.removed) continue;
+        const [dx, dy] = this.headDir(s);
+        const clear = !this.blockerOf(s);
+        let cxp = s.path[0][0], cyp = s.path[0][1];
+        // stop at the first blocking cell (or the edge)
+        let ex = cxp, ey = cyp;
+        while (true) {
+          const nx = ex + dx, ny = ey + dy;
+          if (nx < 0 || ny < 0 || nx >= this.cols || ny >= this.rows) break;
+          const o = this.owner[ny * this.cols + nx];
+          if (o !== -1 && o !== s.id && !this.snakes[o].removed) break;
+          ex = nx; ey = ny;
+        }
+        ctx.strokeStyle = clear ? 'rgba(42,157,143,0.95)' : 'rgba(230,57,70,0.85)';
+        ctx.setLineDash([dash, dash * 0.7]);
+        ctx.beginPath();
+        ctx.moveTo(this.cx(cxp), this.cy(cyp));
+        ctx.lineTo(this.cx(ex), this.cy(ey));
+        ctx.stroke();
+      }
+      ctx.setLineDash([]);
     }
 
     snakeColor(s, now) {

@@ -132,6 +132,18 @@ html, body {
 #board-wrap { flex: 1; min-height: 0; position: relative; }
 #board { display: block; touch-action: none; cursor: pointer; }
 
+.fab {
+  position: absolute; right: 16px; bottom: 16px; z-index: 10;
+  width: 52px; height: 52px; border-radius: 50%;
+  border: 1.5px solid var(--line); background: var(--card); color: var(--ink);
+  display: flex; align-items: center; justify-content: center; cursor: pointer;
+  box-shadow: 0 6px 18px rgba(35, 41, 70, .18);
+  transition: transform .1s, background .15s, color .15s;
+}
+.fab:active { transform: scale(.92); }
+.fab .icon { width: 24px; height: 24px; }
+.fab.active { background: var(--ink); color: #fff; border-color: var(--ink); }
+
 /* ---------- sub screens ---------- */
 .sub-top { display: flex; align-items: center; gap: 8px; padding: 12px 14px 6px; }
 .sub-top h2 { font-size: 20px; }

@@ -6,7 +6,8 @@
   <meta name="theme-color" content="#f7f7fb">
   <title>Arrows</title>
   <link rel="stylesheet" href="css/style.css">
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><path d='M32 58V14M32 14L17 30M32 14l15 16' fill='none' stroke='%23232946' stroke-width='9' stroke-linecap='round' stroke-linejoin='round'/></svg>">
+  <link rel="icon" type="image/png" href="images/logo.png">
+  <link rel="apple-touch-icon" href="images/logo.png">
 </head>
 <body>
   <!-- icon sprite -->
@@ -71,6 +72,12 @@
         <circle cx="12" cy="12" r="8.5"/><path d="m8.2 12.4 2.7 2.7 5-5.4"/>
       </g>
     </symbol>
+    <symbol id="i-grid" viewBox="0 0 24 24">
+      <g fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round">
+        <rect x="3.5" y="3.5" width="17" height="17" rx="1.5"/>
+        <path d="M9 3.5V20.5M15 3.5V20.5M3.5 9H20.5M3.5 15H20.5"/>
+      </g>
+    </symbol>
   </svg>
 
   <div id="app">
@@ -87,11 +94,26 @@
 
       <div class="logo">
         <div class="logo-mark">
-          <svg viewBox="0 0 64 64" width="72" height="72" aria-hidden="true">
-            <g stroke="#232946" stroke-width="7" stroke-linecap="round" stroke-linejoin="round" fill="none">
-              <path d="M14 54 V16 M14 16 l-7 9 M14 16 l7 9"/>
-              <path d="M54 24 H30 M30 24 l9 -7 M30 24 l9 7"/>
-              <path d="M54 44 H36 V54 M36 44 l9 -7"/>
+          <svg viewBox="0 0 512 512" width="112" height="112" aria-hidden="true">
+            <defs>
+              <style>
+                .lm-bg { fill: #F3F5F9; }
+                .lm-line { fill: none; stroke: #20293F; stroke-width: 32; stroke-linecap: round; stroke-linejoin: round; }
+                .lm-arrowhead { fill: #20293F; stroke: #20293F; stroke-width: 8; stroke-linejoin: round; stroke-linecap: round; }
+              </style>
+            </defs>
+            <rect width="512" height="512" rx="112" class="lm-bg" />
+            <g transform="translate(16, 16)">
+              <!-- Top-left L-track -->
+              <path d="M 100 200 L 165 200 L 165 70" class="lm-line" />
+              <!-- Center downward arrow -->
+              <path d="M 245 70 L 245 205" class="lm-line" />
+              <polygon points="245,245 205,190 285,190" class="lm-arrowhead" />
+              <!-- Right-to-left snaking arrow -->
+              <path d="M 400 200 L 345 200 L 345 315 L 185 315" class="lm-line" />
+              <polygon points="145,315 200,275 200,355" class="lm-arrowhead" />
+              <!-- Ambient grid dot -->
+              <circle cx="345" cy="100" r="14" fill="#D3D9E3" />
             </g>
           </svg>
         </div>
@@ -134,7 +156,12 @@
           <span><svg class="icon"><use href="#i-heart"/></svg></span>
         </div>
       </header>
-      <div id="board-wrap"><canvas id="board"></canvas></div>
+      <div id="board-wrap">
+        <canvas id="board"></canvas>
+        <button id="btn-grid" class="fab" title="Show grid & arrow paths" aria-pressed="false">
+          <svg class="icon"><use href="#i-grid"/></svg>
+        </button>
+      </div>
     </section>
 
     <!-- ============ LEADERBOARD ============ -->

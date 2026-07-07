@@ -18,6 +18,7 @@
 
   let user = null;       // server state
   let game = null;       // active ArrowsGame
+  let gridMode = localStorage.getItem('arrows_grid') === '1';
   let currentLevel = 0;
   let livesTicker = 0;
   let offline = false;
@@ -121,6 +122,7 @@
         onFail: onLevelFailed,
         onWin: onLevelWon
       });
+      game.setGridMode(gridMode);
     });
   }
 
@@ -292,6 +294,18 @@
   $('btn-play').addEventListener('click', () => {
     if (user.lives <= 0) { toast('No lives left!', 'error'); return; }
     startLevel(user.completedLevel + 1);
+  });
+
+  function applyGridBtn() {
+    $('btn-grid').classList.toggle('active', gridMode);
+    $('btn-grid').setAttribute('aria-pressed', String(gridMode));
+  }
+  applyGridBtn();
+  $('btn-grid').addEventListener('click', () => {
+    gridMode = !gridMode;
+    localStorage.setItem('arrows_grid', gridMode ? '1' : '0');
+    applyGridBtn();
+    if (game) game.setGridMode(gridMode);
   });
 
   $('btn-quit').addEventListener('click', () => {
